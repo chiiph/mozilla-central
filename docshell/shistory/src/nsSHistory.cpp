@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// Local Includes 
+// Local Includes
 #include "nsSHistory.h"
 
 // Helper Classes
@@ -40,6 +40,8 @@ using namespace mozilla;
 
 #define PREF_SHISTORY_SIZE "browser.sessionhistory.max_entries"
 #define PREF_SHISTORY_MAX_TOTAL_VIEWERS "browser.sessionhistory.max_total_viewers"
+#define PREF_SHISTORY_MAX_FONT_COUNT "browser.sessionhistory.max_font_count"
+#define PREF_SHISTORY_MAX_FONT_ATTEMPTS "browser.sessionhistory.max_font_attempts"
 
 static const char* kObservedPrefs[] = {
   PREF_SHISTORY_SIZE,
@@ -241,6 +243,9 @@ nsSHistory::nsSHistory() : mListRoot(nullptr), mIndex(-1), mLength(0), mRequeste
 {
   // Add this new SHistory object to the list
   PR_APPEND_LINK(this, &gSHistoryList);
+
+  fontAttempsByDomain.Init();
+  fontUsedByDomain.Init();
 }
 
 
@@ -350,7 +355,7 @@ nsSHistory::Startup()
   if (gHistoryMaxSize < defaultHistoryMaxSize) {
     gHistoryMaxSize = defaultHistoryMaxSize;
   }
-  
+
   // Allow the user to override the max total number of cached viewers,
   // but keep the per SHistory cached viewer limit constant
   if (!gObserver) {
@@ -392,7 +397,7 @@ nsSHistory::Shutdown()
   }
 }
 
-/* Add an entry to the History list at mIndex and 
+/* Add an entry to the History list at mIndex and
  * increment the index to point to the new entry
  */
 NS_IMETHODIMP
@@ -433,11 +438,11 @@ nsSHistory::AddEntry(nsISHEntry * aSHEntry, bool aPersist)
     }
   }
 
-  // Set the ShEntry and parent for the transaction. setting the 
+  // Set the ShEntry and parent for the transaction. setting the
   // parent will properly set the parent child relationship
   txn->SetPersist(aPersist);
   NS_ENSURE_SUCCESS(txn->Create(aSHEntry, currentTxn), NS_ERROR_FAILURE);
-   
+
   // A little tricky math here...  Basically when adding an object regardless of
   // what the length was before, it should always be set back to the current and
   // lop off the forward.
@@ -450,7 +455,7 @@ nsSHistory::AddEntry(nsISHEntry * aSHEntry, bool aPersist)
   // Purge History list if it is too long
   if ((gHistoryMaxSize >= 0) && (mLength > gHistoryMaxSize))
     PurgeHistory(mLength-gHistoryMaxSize);
-  
+
   RemoveDynEntries(mIndex - 1, mIndex);
   return NS_OK;
 }
@@ -511,9 +516,9 @@ nsSHistory::GetEntryAtIndex(int32_t aIndex, bool aModifyIndex, nsIHistoryEntry**
   nsresult rv;
   nsCOMPtr<nsISHEntry> shEntry;
   rv = GetEntryAtIndex(aIndex, aModifyIndex, getter_AddRefs(shEntry));
-  if (NS_SUCCEEDED(rv) && shEntry) 
+  if (NS_SUCCEEDED(rv) && shEntry)
     rv = CallQueryInterface(shEntry, aResult);
- 
+
   return rv;
 }
 
@@ -527,7 +532,7 @@ nsSHistory::GetTransactionAtIndex(int32_t aIndex, nsISHTransaction ** aResult)
   if ((mLength <= 0) || (aIndex < 0) || (aIndex >= mLength))
     return NS_ERROR_FAILURE;
 
-  if (!mListRoot) 
+  if (!mListRoot)
     return NS_ERROR_FAILURE;
 
   if (aIndex == 0)
@@ -535,7 +540,7 @@ nsSHistory::GetTransactionAtIndex(int32_t aIndex, nsISHTransaction ** aResult)
     *aResult = mListRoot;
     NS_ADDREF(*aResult);
     return NS_OK;
-  } 
+  }
   int32_t   cnt=0;
   nsCOMPtr<nsISHTransaction>  tempPtr;
 
@@ -558,10 +563,10 @@ nsSHistory::GetTransactionAtIndex(int32_t aIndex, nsISHTransaction ** aResult)
         continue;
       }
     }  //NS_SUCCEEDED
-    else 
+    else
       return NS_ERROR_FAILURE;
-  }  // while 
-  
+  }  // while
+
   return NS_OK;
 }
 
@@ -574,11 +579,11 @@ nsSHistory::PrintHistory()
   int32_t index = 0;
   nsresult rv;
 
-  if (!mListRoot) 
+  if (!mListRoot)
     return NS_ERROR_FAILURE;
 
   txn = mListRoot;
-    
+
   while (1) {
     if (!txn)
       break;
@@ -595,7 +600,7 @@ nsSHistory::PrintHistory()
     nsCOMPtr<nsIHistoryEntry> hEntry(do_QueryInterface(entry));
     if (hEntry) {
       hEntry->GetURI(getter_AddRefs(uri));
-      hEntry->GetTitle(getter_Copies(title));              
+      hEntry->GetTitle(getter_Copies(title));
     }
 
 #if 0
@@ -664,7 +669,7 @@ nsSHistory::PurgeHistory(int32_t aEntries)
     return NS_ERROR_FAILURE;
 
   aEntries = NS_MIN(aEntries, mLength);
-  
+
   bool purgeHistory = true;
   NOTIFY_LISTENERS_CANCELABLE(OnHistoryPurge, purgeHistory,
                               (aEntries, &purgeHistory));
@@ -685,7 +690,7 @@ nsSHistory::PurgeHistory(int32_t aEntries)
     if (mListRoot) {
       mListRoot->SetPrev(nullptr);
     }
-    cnt++;        
+    cnt++;
   }
   mLength -= cnt;
   mIndex -= cnt;
@@ -709,7 +714,7 @@ nsSHistory::AddSHistoryListener(nsISHistoryListener * aListener)
   NS_ENSURE_ARG_POINTER(aListener);
 
   // Check if the listener supports Weak Reference. This is a must.
-  // This listener functionality is used by embedders and we want to 
+  // This listener functionality is used by embedders and we want to
   // have the right ownership with who ever listens to SHistory
   nsWeakPtr listener = do_GetWeakReference(aListener);
   if (!listener) return NS_ERROR_FAILURE;
@@ -723,7 +728,7 @@ NS_IMETHODIMP
 nsSHistory::RemoveSHistoryListener(nsISHistoryListener * aListener)
 {
   // Make sure the listener that wants to be removed is the
-  // one we have in store. 
+  // one we have in store.
   nsWeakPtr listener = do_GetWeakReference(aListener);
   mListeners.RemoveElement(listener);
   return NS_OK;
@@ -855,7 +860,7 @@ nsSHistory::Reload(uint32_t aReloadFlags)
 {
   nsresult rv;
   nsDocShellInfoLoadType loadType;
-  if (aReloadFlags & nsIWebNavigation::LOAD_FLAGS_BYPASS_PROXY && 
+  if (aReloadFlags & nsIWebNavigation::LOAD_FLAGS_BYPASS_PROXY &&
       aReloadFlags & nsIWebNavigation::LOAD_FLAGS_BYPASS_CACHE)
   {
     loadType = nsIDocShellLoadInfo::loadReloadBypassProxyAndCache;
@@ -876,7 +881,7 @@ nsSHistory::Reload(uint32_t aReloadFlags)
   {
     loadType = nsIDocShellLoadInfo::loadReloadNormal;
   }
-  
+
   // We are reloading. Send Reload notifications.
   // nsDocShellLoadFlagType is not public, where as nsIWebNavigation
   // is public. So send the reload notifications with the
@@ -959,7 +964,7 @@ nsSHistory::EvictOutOfRangeWindowContentViewers(int32_t aIndex)
 
   LOG(("EvictOutOfRangeWindowContentViewers(index=%d), "
        "mLength=%d. Safe range [%d, %d]",
-       aIndex, mLength, startSafeIndex, endSafeIndex)); 
+       aIndex, mLength, startSafeIndex, endSafeIndex));
 
   // The content viewers in range aIndex -/+ gHistoryMaxViewers will not be
   // evicted.  Collect a set of them so we don't accidentally evict one of them
@@ -1156,7 +1161,7 @@ nsSHistory::EvictExpiredContentViewerForEntry(nsIBFCacheEntry *aEntry)
   }
   if (i > endIndex)
     return NS_OK;
-  
+
   if (i == mIndex) {
     NS_WARNING("How did the current SHEntry expire?");
     return NS_OK;
@@ -1283,7 +1288,7 @@ bool IsSameTree(nsISHEntry* aEntry1, nsISHEntry* aEntry2)
       return false;
     }
   }
-  
+
   return true;
 }
 
@@ -1364,7 +1369,7 @@ nsSHistory::RemoveEntries(nsTArray<uint64_t>& aIDs, int32_t aStartIndex)
   int32_t minIndex = index;
   index = aStartIndex;
   while(index >= 0 && RemoveChildEntries(this, index++, aIDs));
-  
+
   // We need to remove duplicate nsSHEntry trees.
   bool didRemove = false;
   while (index > minIndex) {
@@ -1416,7 +1421,7 @@ nsSHistory::RemoveDynEntries(int32_t aOldIndex, int32_t aNewIndex)
 NS_IMETHODIMP
 nsSHistory::UpdateIndex()
 {
-  // Update the actual index with the right value. 
+  // Update the actual index with the right value.
   if (mIndex != mRequestedIndex && mRequestedIndex != -1) {
     RemoveDynEntries(mIndex, mRequestedIndex);
     mIndex = mRequestedIndex;
@@ -1472,7 +1477,7 @@ nsSHistory::SetSessionHistory(nsISHistory* aSessionHistory)
   return NS_OK;
 }
 
-	
+
 NS_IMETHODIMP
 nsSHistory::GetSessionHistory(nsISHistory** aSessionHistory)
 {
@@ -1556,8 +1561,8 @@ nsSHistory::LoadEntry(int32_t aIndex, long aLoadType, uint32_t aHistCmd)
   }
 
   if (!canNavigate) {
-    // If the listener asked us not to proceed with 
-    // the operation, simply return.    
+    // If the listener asked us not to proceed with
+    // the operation, simply return.
     mRequestedIndex = -1;
     return NS_OK;  // XXX Maybe I can return some other error code?
   }
@@ -1570,16 +1575,16 @@ nsSHistory::LoadEntry(int32_t aIndex, long aLoadType, uint32_t aHistCmd)
     prevAsContainer->GetChildCount(&pCount);
     nextAsContainer->GetChildCount(&nCount);
   }
-  
+
   nsCOMPtr<nsIDocShellLoadInfo> loadInfo;
   if (mRequestedIndex == mIndex) {
-    // Possibly a reload case 
+    // Possibly a reload case
     docShell = mRootDocShell;
   }
   else {
     // Going back or forward.
     if ((pCount > 0) && (nCount > 0)) {
-      /* THis is a subframe navigation. Go find 
+      /* THis is a subframe navigation. Go find
        * the docshell in which load should happen
        */
       bool frameFound = false;
@@ -1636,13 +1641,13 @@ nsSHistory::CompareFrames(nsISHEntry * aPrevEntry, nsISHEntry * aNextEntry, nsID
 
   aPrevEntry->GetID(&prevID);
   aNextEntry->GetID(&nextID);
- 
+
   // Check the IDs to verify if the pages are different.
   if (prevID != nextID) {
     if (aIsFrameFound)
       *aIsFrameFound = true;
     // Set the Subframe flag of the entry to indicate that
-    // it is subframe navigation        
+    // it is subframe navigation
     aNextEntry->SetIsSubFrame(true);
     InitiateLoad(aNextEntry, aParent, aLoadType);
     return NS_OK;
@@ -1721,12 +1726,12 @@ nsSHistory::CompareFrames(nsISHEntry * aPrevEntry, nsISHEntry * aNextEntry, nsID
     // This will either load a new page to shell or some subshell or
     // do nothing.
     CompareFrames(pChild, nChild, dsChild, aLoadType, aIsFrameFound);
-  }     
+  }
   return result;
 }
 
 
-nsresult 
+nsresult
 nsSHistory::InitiateLoad(nsISHEntry * aFrameEntry, nsIDocShell * aFrameDS, long aLoadType)
 {
   NS_ENSURE_STATE(aFrameDS && aFrameEntry);
@@ -1737,7 +1742,7 @@ nsSHistory::InitiateLoad(nsISHEntry * aFrameEntry, nsIDocShell * aFrameDS, long 
    * This will be passed on to child subframes later in nsDocShell,
    * so that proper loadType is maintained through out a frameset
    */
-  aFrameEntry->SetLoadType(aLoadType);    
+  aFrameEntry->SetLoadType(aLoadType);
   aFrameDS->CreateLoadInfo (getter_AddRefs(loadInfo));
 
   loadInfo->SetLoadType(aLoadType);
@@ -1784,6 +1789,111 @@ nsSHistory::GetSHistoryEnumerator(nsISimpleEnumerator** aEnumerator)
   return status;
 }
 
+bool
+nsSHistory::FontUseCountReached(const nsString &domain, const nsFont &font)
+{
+  int32_t maxFonts;
+  Preferences::GetInt(PREF_SHISTORY_MAX_FONT_COUNT, &maxFonts);
+
+  if (maxFonts < 0) {
+    return false;
+  }
+
+  nsTArray<nsFont> fontsUsed;
+  if (!fontAttempsByDomain.Get(domain, &fontsUsed)) {
+    return false;
+  }
+
+  for (uint32_t i = 0; i < fontsUsed.Length(); i++) {
+    if (fontsUsed[i].name.Equals(font.name,
+                                 nsCaseInsensitiveStringComparator())
+        // XXX: Style is sometimes filled with garbage??
+        /*&& mFontsUsed[i].style == font.style*/) {
+      // seen it before: OK
+      return false;
+    }
+  }
+
+  if (fontsUsed.Length() >= maxFonts) {
+    return true;
+  }
+
+  return false;
+}
+
+PRBool
+nsSHistory::FontAttemptCountReached(const nsString &domain, const nsFont &font)
+{
+  if (mMaxFontAttempts < 0) {
+    return PR_FALSE;
+  }
+
+  for (PRUint32 i = 0; i < mFontsTried.Length(); i++) {
+    if (mFontsTried[i].name.Equals(font.name,
+                                  nsCaseInsensitiveStringComparator())
+        // XXX: Style is sometimes filled with garbage??
+        /*&& mFontsTried[i].style == font.style*/) {
+      // seen it before: OK
+      return PR_FALSE;
+    }
+  }
+
+  if (mFontsTried.Length() >= mMaxFontAttempts) {
+    return PR_TRUE;
+  }
+
+  return PR_FALSE;
+}
+
+void
+nsSHistory::AddFontUse(const nsString &domain, const nsFont &font)
+{
+  if (mMaxFonts < 0) {
+    return;
+  }
+
+  for (PRUint32 i = 0; i < mFontsUsed.Length(); i++) {
+    if (mFontsUsed[i].name.Equals(font.name,
+                                  nsCaseInsensitiveStringComparator())
+        // XXX: Style is sometimes filled with garbage??
+        /*&& mFontsUsed[i].style == font.style*/) {
+      // seen it before: OK
+      return;
+    }
+  }
+
+  if (mFontsUsed.Length() >= mMaxFonts) {
+    return;
+  }
+
+  mFontsUsed.AppendElement(font);
+  return;
+}
+
+void
+nsSHistory::AddFontAttempt(const nsString &domain, const nsFont &font)
+{
+  if (mMaxFontAttempts < 0) {
+    return;
+  }
+
+  for (PRUint32 i = 0; i < mFontsTried.Length(); i++) {
+    if (mFontsTried[i].name.Equals(font.name,
+                                  nsCaseInsensitiveStringComparator())
+        // XXX: Style is sometimes filled with garbage??
+        /*&& mFontsTried[i].style == font.style*/) {
+      // seen it before: OK
+      return;
+    }
+  }
+
+  if (mFontsTried.Length() >= mMaxFontAttempts) {
+    return;
+  }
+
+  mFontsTried.AppendElement(font);
+  return;
+}
 
 //*****************************************************************************
 //***    nsSHEnumerator: Object Management
@@ -1807,14 +1917,14 @@ nsSHEnumerator::HasMoreElements(bool * aReturn)
   int32_t cnt;
   *aReturn = false;
   mSHistory->GetCount(&cnt);
-  if (mIndex >= -1 && mIndex < (cnt-1) ) { 
+  if (mIndex >= -1 && mIndex < (cnt-1) ) {
     *aReturn = true;
   }
   return NS_OK;
 }
 
 
-NS_IMETHODIMP 
+NS_IMETHODIMP
 nsSHEnumerator::GetNext(nsISupports **aItem)
 {
   NS_ENSURE_ARG_POINTER(aItem);

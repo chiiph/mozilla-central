@@ -294,7 +294,7 @@ public:
   { SetImageAnimationModeExternal(aMode); }
 #endif
 
-  /** 
+  /**
    * Get medium of presentation
    */
   nsIAtom* Medium() { return mMedium; }
@@ -318,7 +318,7 @@ public:
    * If aLanguage is nullptr, the document's language is used.
    *
    * This object is read-only, you must copy the font to modify it.
-   * 
+   *
    * When aFontID is kPresContext_DefaultVariableFontID or
    * kPresContext_DefaultFixedFontID (which equals
    * kGenericFont_moz_fixed, which is used for the -moz-fixed generic),
@@ -373,7 +373,7 @@ public:
     return false;
   }
 
-  /** 
+  /**
    * Get the default colors
    */
   const nscolor DefaultColor() const { return mDefaultColor; }
@@ -439,7 +439,7 @@ public:
    * context.
    */
   bool IsPaginated() const { return mPaginated; }
-  
+
   /**
    * Sets whether the presentation context can scroll for a paginated
    * context.
@@ -605,7 +605,7 @@ public:
 
   // Margin-specific version, since they often need TwipsToAppUnits
   static nsMargin CSSTwipsToAppUnits(const nsIntMargin &marginInTwips)
-  { return nsMargin(CSSTwipsToAppUnits(float(marginInTwips.left)), 
+  { return nsMargin(CSSTwipsToAppUnits(float(marginInTwips.left)),
                     CSSTwipsToAppUnits(float(marginInTwips.top)),
                     CSSTwipsToAppUnits(float(marginInTwips.right)),
                     CSSTwipsToAppUnits(float(marginInTwips.bottom))); }
@@ -683,7 +683,7 @@ public:
    *
    *  Visual directionality is a presentation method that displays text
    *  as if it were a uni-directional, according to the primary display
-   *  direction only. 
+   *  direction only.
    *
    *  Implicit directionality is a presentation method in which the
    *  direction is determined by the Bidi algorithm according to the
@@ -708,7 +708,7 @@ public:
 
   /**
    * Set the Bidi options for the presentation context
-   */  
+   */
   NS_HIDDEN_(void) SetBidi(uint32_t aBidiOptions,
                            bool aForceRestyle = false);
 
@@ -770,7 +770,7 @@ public:
      whether the prescontext is now being shown.
   */
   NS_HIDDEN_(bool) EnsureVisible();
-  
+
 #ifdef MOZ_REFLOW_PERF
   NS_HIDDEN_(void) CountReflows(const char * aName,
                                 nsIFrame * aFrame);
@@ -812,7 +812,7 @@ public:
   }
 
   bool             SupressingResizeReflow() const { return mSupressResizeReflow; }
-  
+
   virtual NS_HIDDEN_(gfxUserFontSet*) GetUserFontSetExternal();
   NS_HIDDEN_(gfxUserFontSet*) GetUserFontSetInternal();
 #ifdef _IMPL_NS_LAYOUT
@@ -910,7 +910,7 @@ public:
     bool mInterruptsEnabled;
     bool mHasPendingInterrupt;
   };
-    
+
   /**
    * Check for interrupts. This may return true if a pending event is
    * detected. Once it has returned true, it will keep returning true
@@ -1079,7 +1079,7 @@ public:
   bool MayHavePaintEventListener();
 
   /**
-   * Checks for MozAfterPaint listeners on the document and 
+   * Checks for MozAfterPaint listeners on the document and
    * any subdocuments, except for subdocuments that are non-top-level
    * content documents.
    */
@@ -1255,7 +1255,7 @@ protected:
 
   unsigned              mFireAfterPaintEvents : 1;
 
-  // Cache whether we are chrome or not because it is expensive.  
+  // Cache whether we are chrome or not because it is expensive.
   // mIsChromeIsCached tells us if mIsChrome is valid or we need to get the
   // value the slow way.
   mutable unsigned      mIsChromeIsCached : 1;
@@ -1421,7 +1421,7 @@ protected:
 #ifdef MOZ_REFLOW_PERF
 
 #define DO_GLOBAL_REFLOW_COUNT(_name) \
-  aPresContext->CountReflows((_name), (nsIFrame*)this); 
+  aPresContext->CountReflows((_name), (nsIFrame*)this);
 #else
 #define DO_GLOBAL_REFLOW_COUNT(_name)
 #endif // MOZ_REFLOW_PERF

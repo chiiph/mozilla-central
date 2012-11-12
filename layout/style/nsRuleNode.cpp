@@ -39,6 +39,8 @@
 #include "nsContentUtils.h"
 #include "CSSCalc.h"
 #include "nsPrintfCString.h"
+#include "nsGlobalWindow.h"
+#include "nsPIWindowRoot.h"
 
 #include "mozilla/Assertions.h"
 #include "mozilla/dom/Element.h"
@@ -504,7 +506,7 @@ struct LengthPercentPairCalcOps : public css::NumbersAlreadyNormalizedOps
 };
 
 static void
-SpecifiedCalcToComputedCalc(const nsCSSValue& aValue, nsStyleCoord& aCoord, 
+SpecifiedCalcToComputedCalc(const nsCSSValue& aValue, nsStyleCoord& aCoord,
                             nsStyleContext* aStyleContext,
                             bool& aCanStoreInRuleTree)
 {
@@ -770,7 +772,7 @@ SetPairCoords(const nsCSSValue& aValue,
 
   bool cX = SetCoord(valX, aCoordX, aParentX, aMask, aStyleContext,
                        aPresContext, aCanStoreInRuleTree);
-  mozilla::DebugOnly<bool> cY = SetCoord(valY, aCoordY, aParentY, aMask, 
+  mozilla::DebugOnly<bool> cY = SetCoord(valY, aCoordY, aParentY, aMask,
                        aStyleContext, aPresContext, aCanStoreInRuleTree);
   NS_ABORT_IF_FALSE(cX == cY, "changed one but not the other");
   return cX;
@@ -2524,8 +2526,8 @@ nsRuleNode::CalcFontPointSize(int32_t aHTMLSize, int32_t aBasePointSize,
                               nsPresContext* aPresContext,
                               nsFontSizeType aFontSizeType)
 {
-#define sFontSizeTableMin  9 
-#define sFontSizeTableMax 16 
+#define sFontSizeTableMin  9
+#define sFontSizeTableMax 16
 
 // This table seems to be the one used by MacIE5. We hope its adoption in Mozilla
 // and eventually in WinIE5.5 will help to establish a standard rendering across
@@ -2653,7 +2655,7 @@ nsRuleNode::CalcFontPointSize(int32_t aHTMLSize, int32_t aBasePointSize,
 //------------------------------------------------------------------------------
 
 /* static */ nscoord
-nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize, 
+nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize,
                                     nsPresContext* aPresContext,
                                     nsFontSizeType aFontSizeType)
 {
@@ -2677,9 +2679,9 @@ nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize,
     indexMin = 0;
     indexMax = 6;
   }
-  
+
   smallestIndexFontSize = CalcFontPointSize(indexMin, aBasePointSize, aPresContext, aFontSizeType);
-  largestIndexFontSize = CalcFontPointSize(indexMax, aBasePointSize, aPresContext, aFontSizeType); 
+  largestIndexFontSize = CalcFontPointSize(indexMax, aBasePointSize, aPresContext, aFontSizeType);
   if (aFontSize > smallestIndexFontSize) {
     if (aFontSize < NSToCoordRound(float(largestIndexFontSize) * 1.5)) { // smaller will be in HTML table
       // find largest index smaller than current
@@ -2687,7 +2689,7 @@ nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize,
         indexFontSize = CalcFontPointSize(index, aBasePointSize, aPresContext, aFontSizeType);
         if (indexFontSize < aFontSize)
           break;
-      } 
+      }
       // set up points beyond table for interpolation purposes
       if (indexFontSize == smallestIndexFontSize) {
         smallerIndexFontSize = indexFontSize - onePx;
@@ -2700,9 +2702,9 @@ nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize,
         largerIndexFontSize = CalcFontPointSize(index+1, aBasePointSize, aPresContext, aFontSizeType);
       }
       // compute the relative position of the parent size between the two closest indexed sizes
-      relativePosition = float(aFontSize - indexFontSize) / float(largerIndexFontSize - indexFontSize);            
+      relativePosition = float(aFontSize - indexFontSize) / float(largerIndexFontSize - indexFontSize);
       // set the new size to have the same relative position between the next smallest two indexed sizes
-      smallerSize = smallerIndexFontSize + NSToCoordRound(relativePosition * (indexFontSize - smallerIndexFontSize));      
+      smallerSize = smallerIndexFontSize + NSToCoordRound(relativePosition * (indexFontSize - smallerIndexFontSize));
     }
     else {  // larger than HTML table, drop by 33%
       smallerSize = NSToCoordRound(float(aFontSize) / 1.5);
@@ -2719,7 +2721,7 @@ nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize,
 //------------------------------------------------------------------------------
 
 /* static */ nscoord
-nsRuleNode::FindNextLargerFontSize(nscoord aFontSize, int32_t aBasePointSize, 
+nsRuleNode::FindNextLargerFontSize(nscoord aFontSize, int32_t aBasePointSize,
                                    nsPresContext* aPresContext,
                                    nsFontSizeType aFontSizeType)
 {
@@ -2744,13 +2746,13 @@ nsRuleNode::FindNextLargerFontSize(nscoord aFontSize, int32_t aBasePointSize,
     indexMin = 0;
     indexMax = 6;
   }
-  
+
   smallestIndexFontSize = CalcFontPointSize(indexMin, aBasePointSize, aPresContext, aFontSizeType);
-  largestIndexFontSize = CalcFontPointSize(indexMax, aBasePointSize, aPresContext, aFontSizeType); 
+  largestIndexFontSize = CalcFontPointSize(indexMax, aBasePointSize, aPresContext, aFontSizeType);
   if (aFontSize > (smallestIndexFontSize - onePx)) {
     if (aFontSize < largestIndexFontSize) { // larger will be in HTML table
       // find smallest index larger than current
-      for (index = indexMin; index <= indexMax; index++) { 
+      for (index = indexMin; index <= indexMax; index++) {
         indexFontSize = CalcFontPointSize(index, aBasePointSize, aPresContext, aFontSizeType);
         if (indexFontSize > aFontSize)
           break;
@@ -3461,6 +3463,16 @@ nsRuleNode::ComputeFontData(void* aStartStruct,
                             const bool aCanStoreInRuleTree)
 {
   COMPUTE_START_INHERITED(Font, (mPresContext), font, parentFont)
+
+    nsGlobalWindow* window = static_cast<nsGlobalWindow*>(mPresContext->PresShell()->GetDocument()->GetWindow());
+
+  nsGlobalWindow* rootwindow = static_cast<nsGlobalWindow*>(mPresContext->PresShell()->GetDocument()->GetWindow()->GetTopWindowRoot().get()->GetWindow());
+
+  nsAutoCString host;
+  mPresContext->PresShell()->GetDocument()->GetBaseURI().get()->GetHost(host);
+
+  fprintf(stdout, "Window for %x is %x => %s. Root: %x\n", (void*)mPresContext, (void*)(window),
+          host.get(), (void*)rootwindow);
 
   // NOTE:  The |aRuleDetail| passed in is a little bit conservative due
   // to the -moz-system-font property.  We really don't need to consider
@@ -5022,7 +5034,7 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
     NS_ASSERTION(result, "Malformed -moz-perspective-origin parse!");
   }
 
-  SetCoord(*aRuleData->ValueForPerspective(), 
+  SetCoord(*aRuleData->ValueForPerspective(),
            display->mChildPerspective, parentDisplay->mChildPerspective,
            SETCOORD_LAH | SETCOORD_INITIAL_ZERO | SETCOORD_NONE,
            aContext, mPresContext, canStoreInRuleTree);
@@ -5164,7 +5176,7 @@ struct BackgroundItemComputer<nsCSSValuePairList, nsStyleBackground::Repeat>
                  (aSpecifiedValue->mYValue.GetUnit() == eCSSUnit_Enumerated ||
                   aSpecifiedValue->mYValue.GetUnit() == eCSSUnit_Null),
                  "Invalid unit");
-    
+
     bool hasContraction = true;
     uint8_t value = aSpecifiedValue->mXValue.GetIntValue();
     switch (value) {
@@ -5181,13 +5193,13 @@ struct BackgroundItemComputer<nsCSSValuePairList, nsStyleBackground::Repeat>
       hasContraction = false;
       break;
     }
-    
+
     if (hasContraction) {
       NS_ASSERTION(aSpecifiedValue->mYValue.GetUnit() == eCSSUnit_Null,
                    "Invalid unit.");
       return;
     }
-    
+
     switch (aSpecifiedValue->mYValue.GetUnit()) {
     case eCSSUnit_Null:
       aComputedValue.mYRepeat = aComputedValue.mXRepeat;
@@ -5608,7 +5620,7 @@ nsRuleNode::ComputeBackgroundData(void* aStartStruct,
                         bg->mLayers,
                         parentBG->mLayers, &nsStyleBackground::Layer::mRepeat,
                         initialRepeat, parentBG->mRepeatCount,
-                        bg->mRepeatCount, maxItemCount, rebuild, 
+                        bg->mRepeatCount, maxItemCount, rebuild,
                         canStoreInRuleTree);
 
   // background-attachment: enum, inherit, initial [list]

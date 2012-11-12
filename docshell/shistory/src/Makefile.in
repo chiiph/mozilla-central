@@ -26,4 +26,6 @@ CPPSRCS		= nsSHEntry.cpp        \
 
 include $(topsrcdir)/config/rules.mk
 
-LOCAL_INCLUDES += -I$(srcdir)/../../base
+LOCAL_INCLUDES += -I$(srcdir)/../../base \
+		-I$(topsrcdir)/xpcom/glue/ \
+		$(NULL)

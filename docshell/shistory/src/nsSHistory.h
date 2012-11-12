@@ -20,6 +20,8 @@
 #include "nsISHistoryListener.h"
 #include "nsIHistoryEntry.h"
 #include "nsTObserverArray.h"
+#include "nsDataHashtable.h"
+#include "nsFont.h"
 
 // Needed to maintain global list of all SHistory objects
 #include "prclist.h"
@@ -50,6 +52,11 @@ public:
   // this value is calculated based on the total amount of memory.
   // Otherwise, it comes straight from the pref.
   static uint32_t GetMaxTotalViewers() { return sHistoryMaxTotalViewers; }
+
+  void AddFontUse(const nsString &domain, const nsFont &font);
+  void AddFontAttempt(const nsString &domain, const nsFont &font);
+  PRBool FontUseCountReached(const nsString &domain, const nsFont &font);
+  PRBool FontAttemptCountReached(const nsString &domain, const nsFont &font);
 
 protected:
   virtual ~nsSHistory();
@@ -98,6 +105,10 @@ protected:
 
   // Max viewers allowed total, across all SHistory objects
   static int32_t  sHistoryMaxTotalViewers;
+
+  // Fonts used by domain
+  nsDataHashtable<nsStringHashKey, nsTArray<nsFont>*> fontAttempsByDomain;
+  nsDataHashtable<nsStringHashKey, nsTArray<nsFont>*> fontUsedByDomain;
 };
 //*****************************************************************************
 //***    nsSHEnumerator: Object Management
@@ -110,13 +121,13 @@ public:
   NS_DECL_NSISIMPLEENUMERATOR
 
   nsSHEnumerator(nsSHistory *  aHistory);
-  
+
 protected:
   friend class nsSHistory;
   virtual ~nsSHEnumerator();
 private:
   int32_t     mIndex;
-  nsSHistory *  mSHistory;  
+  nsSHistory *  mSHistory;
 };
 
 #endif   /* nsSHistory */
